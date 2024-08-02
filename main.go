@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 )
 
 type question struct {
@@ -45,17 +47,48 @@ func main() {
 		fmt.Println("Unrecognized argument, try again:")
 	}
 
+	fmt.Println("Would you like to use the default timer? (y/n)")
+	timerSeconds := 30 //Default
+	for {
+		var timerDefault string
+		fmt.Scanln(&timerDefault)
+		if timerDefault == "y" {
+			break
+		} else if timerDefault == "n" {
+			fmt.Println("How many seconds would you like to have in total?")
+			var customTimer string
+			fmt.Scanln(&customTimer)
+			timerSeconds, _ = strconv.Atoi(customTimer)
+			break
+		}
+		fmt.Println("Unrecognized argument, try again:")
+	}
+
 	// Read the CSV file and create the questions slice
 
 	questions := readCSV(finalPath)
-	quiz := quiz{questions, 0}
+	quizInstance := quiz{questions, 0}
 
 	// Ask questions. This is done with a method from a struct, as to be able to modify the quiz object with its according pointer
-	fmt.Println("The quiz will now begin!")
-	quiz.query()
+	fmt.Println("The quiz will begin as soon as you press a button!")
+	fmt.Scan()
+	fmt.Println(timerSeconds, "seconds, START!")
+
+	// Quiz is quizzed within the bounds of the func of the timeout - https://gobyexample.com/timeouts
+
+	timeoutChannel := make(chan quiz) //accepts an argument of the type quiz, not buffered so it is blocking
+	go func() {                       // Will do {}, as long as "cases" dont kick in
+		quizInstance.query()
+		timeoutChannel <- quizInstance
+	}()
+	select {
+	case <-timeoutChannel: //Finishes normally
+	case <-time.After(time.Duration(timerSeconds) * time.Second): //timeout occurs before finishing
+		fmt.Println("Time's off!")
+	}
 
 	// Reveal the results
-	fmt.Printf("From a total of %v questions, you have answered %v correctly.", len(quiz.questions), quiz.score)
+	fmt.Printf("From a total of %v questions, you have answered %v correctly.", len(quizInstance.questions), quizInstance.score)
 
 }
 
